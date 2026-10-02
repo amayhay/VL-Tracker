@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VL Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">VL</div>
+      <div>
+        <strong>VL Portal</strong>
+        <span>Leave Management</span>
+      </div>
+    </div>
+    <nav>
+      <button class="nav-btn active" data-page="dashboard">Dashboard</button>
+      <button class="nav-btn" data-page="request">Request VL</button>
+      <button class="nav-btn" data-page="calendar">Team Calendar</button>
+      <button class="nav-btn" data-page="requests">My Requests</button>
+    </nav>
+    <div class="sidebar-footer">Internal Leave Management</div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Vacation Leave</p>
+        <h1 id="pageTitle">Dashboard</h1>
+      </div>
+      <div class="user-chip">
+        <div class="avatar">A</div>
+        <div>
+          <strong>Alex</strong>
+          <span>Employee</span>
+        </div>
+      </div>
+    </header>
+
+    <section id="dashboard" class="page active">
+      <div class="hero">
+        <div>
+          <p class="eyebrow">Welcome back</p>
+          <h2>Manage your vacation leave in one place.</h2>
+          <p>Submit requests, track approvals, and see the team calendar.</p>
+        </div>
+        <button class="primary" onclick="showPage('request')">+ Request VL</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card"><span>Leave Balance</span><strong>10</strong><small>days available</small></div>
+        <div class="stat-card"><span>Total Taken</span><strong>5</strong><small>days this year</small></div>
+        <div class="stat-card"><span>Pending</span><strong id="pendingCount">1</strong><small>request awaiting approval</small></div>
+        <div class="stat-card"><span>Upcoming</span><strong>1</strong><small>approved leave</small></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><div><h3>Upcoming Leave</h3><p>Your next approved leave</p></div></div>
+          <div class="leave-row">
+            <div class="date-box"><strong>10</strong><span>OCT</span></div>
+            <div><strong>Alex</strong><span>October 10 – October 12, 2026</span></div>
+            <span class="status approved">Approve</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div><h3>Pending Request</h3><p>Latest request status</p></div></div>
+          <div class="leave-row">
+            <div class="date-box"><strong>20</strong><span>OCT</span></div>
+            <div><strong>Alex</strong><span>October 20 – October 22, 2026</span></div>
+            <span class="status pending">Waiting Approval</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="request" class="page">
+      <div class="section-title"><div><h2>Request Vacation Leave</h2><p>Submit a new leave request for manager approval.</p></div></div>
+      <div class="card form-card">
+        <form id="vlForm">
+          <label>Employee Name<input id="employeeName" value="Alex" required></label>
+          <div class="form-grid">
+            <label>Start Date<input id="startDate" type="date" required></label>
+            <label>End Date<input id="endDate" type="date" required></label>
+          </div>
+          <div id="conflictBox" class="conflict hidden"></div>
+          <div class="form-actions">
+            <button type="button" class="secondary" onclick="showPage('dashboard')">Cancel</button>
+            <button type="submit" class="primary">Submit Request</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="calendar" class="page">
+      <div class="section-title">
+        <div><h2>Team Calendar</h2><p>See team leave and approval status.</p></div>
+        <button class="primary" onclick="showPage('request')">+ Request VL</button>
+      </div>
+      <div class="calendar-card">
+        <div class="calendar-toolbar">
+          <button class="icon-btn" onclick="changeMonth(-1)">‹</button>
+          <h2 id="monthLabel"></h2>
+          <button class="icon-btn" onclick="changeMonth(1)">›</button>
+        </div>
+        <div class="weekdays">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+        <div class="legend">
+          <span><i class="dot approved-dot"></i> Approve</span>
+          <span><i class="dot pending-dot"></i> Waiting Approval</span>
+          <span><i class="dot rejected-dot"></i> Disapprove</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="requests" class="page">
+      <div class="section-title"><div><h2>My Requests</h2><p>Track your submitted vacation leave.</p></div></div>
+      <div class="card table-card">
+        <table>
+          <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Status</th></tr></thead>
+          <tbody id="requestTable"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
