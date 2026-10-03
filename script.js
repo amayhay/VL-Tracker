@@ -5,9 +5,9 @@
 const MANAGER_PASSWORD = "1234";
 
 let employees = [
-  {name:"Alex", balance:15},
-  {name:"Juan", balance:15},
-  {name:"John", balance:15}
+  {name:"Alex", totalVL:15},
+  {name:"Juan", totalVL:12},
+  {name:"John", totalVL:20}
 ];
 
 const leaveData = [
@@ -87,11 +87,12 @@ function renderDashboard(){
       .filter(x => x.employee === emp.name && x.status === "Approve")
       .reduce((sum,x) => sum + leaveDays(x.start,x.end),0);
 
-    const available = Math.max(0, emp.balance - approved);
+    const available = Math.max(0, emp.totalVL - approved);
 
     return `
       <tr>
         <td><strong>${emp.name}</strong></td>
+        <td>${emp.totalVL}</td>
         <td>${approved}</td>
         <td>${available}</td>
       </tr>
@@ -169,8 +170,8 @@ function renderEmployeeManager(){
       <td><strong>${emp.name}</strong></td>
       <td>
         <div class="manager-actions">
-          <input class="employee-balance-input" id="balance-${i}" type="number" min="0" value="${emp.balance}">
-          <button class="small-btn" onclick="saveEmployeeBalance(${i})">Save</button>
+          <input class="employee-balance-input" id="totalVL-${i}" type="number" min="0" value="${emp.totalVL}">
+          <button class="small-btn" onclick="saveEmployeeTotalVL(${i})">Save</button>
         </div>
       </td>
       <td>
@@ -180,16 +181,16 @@ function renderEmployeeManager(){
   `).join("");
 }
 
-function saveEmployeeBalance(i){
-  const input = document.getElementById(`balance-${i}`);
+function saveEmployeeTotalVL(i){
+  const input = document.getElementById(`totalVL-${i}`);
   const value = Number(input.value);
 
   if(!Number.isFinite(value) || value < 0){
-    alert("Please enter a valid VL balance.");
+    alert("Please enter a valid Total VL.");
     return;
   }
 
-  employees[i].balance = value;
+  employees[i].totalVL = value;
   renderEmployeeManager();
   renderDashboard();
 }
