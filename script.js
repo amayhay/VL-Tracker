@@ -1,389 +1,405 @@
-// ============================================================
-// MANAGER PASSWORD
-// CHANGE THIS ONE LINE TO CHANGE THE PASSWORD
-// ============================================================
 const MANAGER_PASSWORD = "1234";
 
-let employees = [
-  {name:"Alex", totalVL:15},
-  {name:"Juan", totalVL:12},
-  {name:"John", totalVL:20}
+// Demo data for the frontend prototype.
+// Changes are saved in the browser using localStorage.
+const defaultEmployees = [
+  { name: "Alex", totalVL: 15 },
+  { name: "Juan", totalVL: 12 },
+  { name: "John", totalVL: 20 }
 ];
 
-const leaveData = [
-  {employee:"Alex", start:"2026-10-10", end:"2026-10-12", status:"Approve"},
-  {employee:"Juan", start:"2026-10-15", end:"2026-10-17", status:"Waiting Approval"},
-  {employee:"John", start:"2026-10-20", end:"2026-10-22", status:"Disapprove"}
+const defaultLeaveData = [
+  { employee: "Alex", start: "2026-10-10", end: "2026-10-12", status: "Approve" },
+  { employee: "Juan", start: "2026-10-15", end: "2026-10-17", status: "Waiting Approval" },
+  { employee: "John", start: "2026-10-20", end: "2026-10-22", status: "Disapprove" }
 ];
 
-let currentMonth = new Date(2026,9,1);
-let managerUnlocked = false;
+let employees = loadData("vl_employees", defaultEmployees);
+let leaveData = loadData("vl_requests", defaultLeaveData);
 
-const titles = {
-  dashboard:"Dashboard",
-  request:"Request VL",
-  calendar:"Team Calendar",
-  manager:"Manager Dashboard"
-};
-
-document.querySelectorAll(".nav-btn").forEach(btn =>
-  btn.addEventListener("click", () => {
-    const page = btn.dataset.page;
-    if(page === "manager" && !managerUnlocked){
-      openManagerLogin();
-      return;
-    }
-    showPage(page);
-  })
-);
-
-function showPage(page){
-  document.querySelectorAll(".page").forEach(p =>
-    p.classList.toggle("active", p.id === page)
-  );
-  document.querySelectorAll(".nav-btn").forEach(b =>
-    b.classList.toggle("active", b.dataset.page === page)
-  );
-  document.getElementById("pageTitle").textContent = titles[page];
-
-  if(page === "dashboard") renderDashboard();
-  if(page === "calendar") renderCalendar();
-  if(page === "manager"){
-    renderManager();
-    renderManagerCalendar();
-    renderEmployeeManager();
+function loadData(key, fallback) {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : structuredClone(fallback);
+  } catch {
+    return structuredClone(fallback);
   }
 }
 
-function dateObj(s){
-  const [y,m,d] = s.split("-").map(Number);
-  return new Date(y,m-1,d);
+function saveData() {
+  localStorage.setItem("vl_employees", JSON.stringify(employees));
+  localStorage.setItem("vl_requests", JSON.stringify(leaveData));
 }
 
-function formatDate(s){
-  return dateObj(s).toLocaleDateString("en-US", {
-    month:"short", day:"numeric", year:"numeric"
+function showPage(page) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active-page"));
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+
+  const pageEl = document.getElementById(page + "Page");
+  const navEl = document.querySelector(`[data-page="${page}"]`);
+
+  if (pageEl) pageEl.classList.add("active-page");
+  if (navEl) navEl.classList.add("active");
+
+  const titles = {
+    dashboard: "Dashboard",
+    request: "Request VL",
+    manager: "Manager Dashboard"
+  };
+  document.getElementById("pageTitle").textContent = titles[page] || "VL Tracker";
+
+  if (page === "dashboard") renderDashboard();
+  if (page === "request") renderEmployeeSelect();
+  if (page === "manager") {
+    renderEmployeeManager();
+    renderManagerRequests();
+  }
+}
+
+function openManager() {
+  const password = prompt("Enter manager password:");
+  if (password === null) return;
+
+  if (password === MANAGER_PASSWORD) {
+    showPage("manager");
+  } else {
+    alert("Incorrect manager password.");
+  }
+}
+
+function leaveDays(start, end) {
+  const startDate = new Date(start + "T00:00:00");
+  const endDate = new Date(end + "T00:00:00");
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 0;
+
+  const diff = Math.floor((endDate - startDate) / 86400000) + 1;
+  return Math.max(0, diff);
+}
+
+function getApprovedVL(employeeName) {
+  return leaveData
+    .filter(item => item.employee === employeeName && item.status === "Approve")
+    .reduce((sum, item) => sum + leaveDays(item.start, item.end), 0);
+}
+
+function getAvailableVL(employee) {
+  return Math.max(0, Number(employee.totalVL) - getApprovedVL(employee.name));
+}
+
+function statusClass(status) {
+  if (status === "Approve") return "approve";
+  if (status === "Disapprove") return "disapprove";
+  return "waiting";
+}
+
+function statusBadge(status) {
+  return `<span class="status ${statusClass(status)}">${status}</span>`;
+}
+
+function renderDashboard() {
+  document.getElementById("employeeCount").textContent = employees.length;
+
+  const employeeBody = document.getElementById("dashboardEmployees");
+
+  if (!employees.length) {
+    employeeBody.innerHTML = `<tr><td colspan="4" class="empty-state">No employees added yet.</td></tr>`;
+  } else {
+    employeeBody.innerHTML = employees.map(emp => {
+      const approved = getApprovedVL(emp.name);
+      const available = getAvailableVL(emp);
+
+      return `
+        <tr>
+          <td class="employee-name">${escapeHtml(emp.name)}</td>
+          <td class="number-cell">${formatVL(emp.totalVL)}</td>
+          <td class="number-cell">${formatVL(approved)}</td>
+          <td class="available-cell">${formatVL(available)}</td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  const requestBody = document.getElementById("dashboardRequests");
+
+  if (!leaveData.length) {
+    requestBody.innerHTML = `<tr><td colspan="5" class="empty-state">No VL requests yet.</td></tr>`;
+  } else {
+    requestBody.innerHTML = leaveData.map(item => `
+      <tr>
+        <td class="employee-name">${escapeHtml(item.employee)}</td>
+        <td>${formatDate(item.start)}</td>
+        <td>${formatDate(item.end)}</td>
+        <td class="number-cell">${leaveDays(item.start, item.end)}</td>
+        <td>${statusBadge(item.status)}</td>
+      </tr>
+    `).join("");
+  }
+}
+
+function renderEmployeeSelect() {
+  const select = document.getElementById("employeeSelect");
+
+  if (!employees.length) {
+    select.innerHTML = `<option value="">No employees available</option>`;
+    return;
+  }
+
+  select.innerHTML = employees.map(emp =>
+    `<option value="${escapeAttribute(emp.name)}">${escapeHtml(emp.name)}</option>`
+  ).join("");
+}
+
+function submitRequest() {
+  const employee = document.getElementById("employeeSelect").value;
+  const start = document.getElementById("startDate").value;
+  const end = document.getElementById("endDate").value;
+
+  if (!employee || !start || !end) {
+    alert("Please complete all fields.");
+    return;
+  }
+
+  if (end < start) {
+    alert("End Date cannot be earlier than Start Date.");
+    return;
+  }
+
+  const days = leaveDays(start, end);
+  const employeeRecord = employees.find(x => x.name === employee);
+
+  if (!employeeRecord) {
+    alert("Employee not found.");
+    return;
+  }
+
+  const available = getAvailableVL(employeeRecord);
+
+  if (days > available) {
+    alert(`This request is ${days} day(s), but ${employee} only has ${available} day(s) of available VL.`);
+    return;
+  }
+
+  leaveData.unshift({
+    employee,
+    start,
+    end,
+    status: "Waiting Approval"
   });
+
+  saveData();
+
+  alert("VL request submitted successfully.");
+  document.getElementById("startDate").value = "";
+  document.getElementById("endDate").value = "";
+  showPage("dashboard");
 }
 
-function statusClass(s){
-  return s === "Approve" ? "approved" :
-         s === "Disapprove" ? "rejected" : "pending";
-}
+function renderEmployeeManager() {
+  const body = document.getElementById("employeeManagerTable");
 
-function leaveDays(start,end){
-  return Math.floor((dateObj(end)-dateObj(start))/86400000)+1;
-}
+  if (!employees.length) {
+    body.innerHTML = `<tr><td colspan="5" class="empty-state">No employees added yet.</td></tr>`;
+    return;
+  }
 
-function overlaps(a,b,c,d){
-  return dateObj(a) <= dateObj(d) && dateObj(c) <= dateObj(b);
-}
-
-function renderDashboard(){
-  const tbody = document.getElementById("employeeTable");
-
-  tbody.innerHTML = employees.map(emp => {
-    const approved = leaveData
-      .filter(x => x.employee === emp.name && x.status === "Approve")
-      .reduce((sum,x) => sum + leaveDays(x.start,x.end),0);
-
-    const available = Math.max(0, emp.totalVL - approved);
+  body.innerHTML = employees.map((emp, index) => {
+    const approved = getApprovedVL(emp.name);
+    const available = getAvailableVL(emp);
 
     return `
       <tr>
-        <td><strong>${emp.name}</strong></td>
-        <td>${emp.totalVL}</td>
-        <td>${approved}</td>
-        <td>${available}</td>
+        <td class="employee-name">${escapeHtml(emp.name)}</td>
+        <td>
+          <div class="action-group">
+            <input
+              class="employee-balance-input"
+              id="totalVL-${index}"
+              type="number"
+              min="0"
+              step="0.5"
+              value="${Number(emp.totalVL)}"
+              aria-label="Total VL for ${escapeAttribute(emp.name)}"
+            >
+            <button class="small-btn" onclick="saveEmployeeTotalVL(${index})">Save</button>
+          </div>
+        </td>
+        <td class="number-cell">${formatVL(approved)}</td>
+        <td class="available-cell">${formatVL(available)}</td>
+        <td>
+          <button class="delete-icon-btn" onclick="deleteEmployee(${index})">Delete</button>
+        </td>
       </tr>
     `;
   }).join("");
-
-  document.getElementById("totalEmployees").textContent = employees.length;
-
-  document.getElementById("totalApproved").textContent =
-    leaveData
-      .filter(x => x.status === "Approve")
-      .reduce((sum,x) => sum + leaveDays(x.start,x.end),0);
-
-  document.getElementById("totalPending").textContent =
-    leaveData.filter(x => x.status === "Waiting Approval").length;
-
-  renderDashboardCalendar();
 }
 
-function renderManager(){
-  const tbody = document.getElementById("managerTable");
+function addEmployee() {
+  const nameInput = document.getElementById("newEmployeeName");
+  const totalInput = document.getElementById("newEmployeeTotalVL");
 
-  tbody.innerHTML = leaveData.map((x,i) => `
-    <tr>
-      <td><strong>${x.employee}</strong></td>
-      <td>${formatDate(x.start)}</td>
-      <td>${formatDate(x.end)}</td>
-      <td><span class="status ${statusClass(x.status)}">${x.status}</span></td>
-      <td>
-        <div class="manager-actions">
-          <select class="status-select" onchange="changeStatus(${i},this.value)">
-            <option ${x.status==="Waiting Approval"?"selected":""}>Waiting Approval</option>
-            <option ${x.status==="Approve"?"selected":""}>Approve</option>
-            <option ${x.status==="Disapprove"?"selected":""}>Disapprove</option>
-          </select>
-          <button class="danger-btn" onclick="deleteRequest(${i})">Delete</button>
-        </div>
-      </td>
-    </tr>
-  `).join("");
+  const name = nameInput.value.trim();
+  const totalVL = Number(totalInput.value);
+
+  if (!name) {
+    alert("Please enter an employee name.");
+    nameInput.focus();
+    return;
+  }
+
+  if (!Number.isFinite(totalVL) || totalVL < 0) {
+    alert("Please enter a valid Total VL.");
+    totalInput.focus();
+    return;
+  }
+
+  const duplicate = employees.some(
+    emp => emp.name.toLowerCase() === name.toLowerCase()
+  );
+
+  if (duplicate) {
+    alert("An employee with that name already exists.");
+    return;
+  }
+
+  employees.push({ name, totalVL });
+  saveData();
+
+  nameInput.value = "";
+  totalInput.value = "";
 
   renderEmployeeManager();
-}
-
-function changeStatus(i,status){
-  leaveData[i].status = status;
-  renderManager();
-  renderManagerCalendar();
-  renderCalendar();
   renderDashboard();
+  renderEmployeeSelect();
+
+  alert(`${name} has been added.`);
 }
 
+function saveEmployeeTotalVL(index) {
+  const input = document.getElementById(`totalVL-${index}`);
+  if (!input) return;
 
-function deleteRequest(i){
-  const request = leaveData[i];
-  if(!request) return;
-
-  if(!confirm(`Delete the VL request for ${request.employee} (${formatDate(request.start)} – ${formatDate(request.end)})?`))
-    return;
-
-  leaveData.splice(i,1);
-
-  renderManager();
-  renderManagerCalendar();
-  renderCalendar();
-  renderDashboard();
-}
-
-function renderEmployeeManager(){
-  const tbody = document.getElementById("employeeManagerTable");
-  if(!tbody) return;
-
-  tbody.innerHTML = employees.map((emp,i) => `
-    <tr>
-      <td><strong>${emp.name}</strong></td>
-      <td>
-        <div class="manager-actions">
-          <input class="employee-balance-input" id="totalVL-${i}" type="number" min="0" value="${emp.totalVL}">
-          <button class="small-btn" onclick="saveEmployeeTotalVL(${i})">Save</button>
-        </div>
-      </td>
-      <td>
-        <button class="danger-btn" onclick="deleteEmployee(${i})">Delete Employee</button>
-      </td>
-    </tr>
-  `).join("");
-}
-
-function saveEmployeeTotalVL(i){
-  const input = document.getElementById(`totalVL-${i}`);
   const value = Number(input.value);
 
-  if(!Number.isFinite(value) || value < 0){
+  if (!Number.isFinite(value) || value < 0) {
     alert("Please enter a valid Total VL.");
     return;
   }
 
-  employees[i].totalVL = value;
+  employees[index].totalVL = value;
+  saveData();
+
   renderEmployeeManager();
   renderDashboard();
 }
 
-function deleteEmployee(i){
-  const employee = employees[i];
-  if(!employee) return;
+function deleteEmployee(index) {
+  const employee = employees[index];
 
-  if(!confirm(`Delete employee "${employee.name}"? This will also remove their plotted VL requests.`))
-    return;
+  if (!employee) return;
 
-  employees.splice(i,1);
+  const hasRequests = leaveData.some(item => item.employee === employee.name);
 
-  for(let j=leaveData.length-1;j>=0;j--){
-    if(leaveData[j].employee === employee.name)
-      leaveData.splice(j,1);
-  }
+  const message = hasRequests
+    ? `Delete ${employee.name}? Their existing VL requests will also be deleted.`
+    : `Delete ${employee.name}?`;
+
+  if (!confirm(message)) return;
+
+  employees.splice(index, 1);
+
+  leaveData = leaveData.filter(item => item.employee !== employee.name);
+
+  saveData();
 
   renderEmployeeManager();
-  renderManager();
-  renderManagerCalendar();
-  renderCalendar();
+  renderManagerRequests();
   renderDashboard();
+  renderEmployeeSelect();
 }
 
-function buildMini(targetId){
-  const target = document.getElementById(targetId);
-  if(!target) return;
+function renderManagerRequests() {
+  const body = document.getElementById("managerRequests");
 
-  target.innerHTML = "";
-
-  const y = currentMonth.getFullYear();
-  const m = currentMonth.getMonth();
-  const first = new Date(y,m,1).getDay();
-  const days = new Date(y,m+1,0).getDate();
-
-  for(let i=0;i<first;i++)
-    target.insertAdjacentHTML("beforeend",'<div class="mini-day empty"></div>');
-
-  for(let d=1;d<=days;d++){
-    const iso = `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-    const events = leaveData.filter(x => iso >= x.start && iso <= x.end);
-
-    target.insertAdjacentHTML("beforeend",`
-      <div class="mini-day">
-        <b>${d}</b>
-        ${events.map(x => `<span class="mini-event ${statusClass(x.status)}">${x.employee}</span>`).join("")}
-      </div>
-    `);
-  }
-}
-
-function renderDashboardCalendar(){ buildMini("dashboardCalendar"); }
-function renderManagerCalendar(){ buildMini("managerCalendar"); }
-
-function renderCalendar(){
-  const y = currentMonth.getFullYear();
-  const m = currentMonth.getMonth();
-
-  document.getElementById("monthLabel").textContent =
-    currentMonth.toLocaleDateString("en-US",{month:"long",year:"numeric"});
-
-  const first = new Date(y,m,1).getDay();
-  const days = new Date(y,m+1,0).getDate();
-  const prev = new Date(y,m,0).getDate();
-  const grid = document.getElementById("calendarGrid");
-
-  grid.innerHTML = "";
-
-  for(let i=0;i<42;i++){
-    let n = i-first+1;
-    let cellDate, other=false;
-
-    if(n<1){
-      cellDate = new Date(y,m-1,prev+n);
-      other=true;
-    } else if(n>days){
-      cellDate = new Date(y,m+1,n-days);
-      other=true;
-    } else {
-      cellDate = new Date(y,m,n);
-    }
-
-    const cell = document.createElement("div");
-    cell.className = "day" + (other ? " other" : "");
-    cell.innerHTML = `<div class="day-number">${cellDate.getDate()}</div>`;
-
-    const iso =
-      `${cellDate.getFullYear()}-${String(cellDate.getMonth()+1).padStart(2,"0")}-${String(cellDate.getDate()).padStart(2,"0")}`;
-
-    leaveData
-      .filter(x => iso >= x.start && iso <= x.end)
-      .forEach(x => {
-        const e = document.createElement("div");
-        e.className = `event ${statusClass(x.status)}`;
-        e.textContent = `${x.employee} • ${x.status}`;
-        cell.appendChild(e);
-      });
-
-    grid.appendChild(cell);
-  }
-}
-
-function changeMonth(delta){
-  currentMonth.setMonth(currentMonth.getMonth()+delta);
-  renderCalendar();
-  renderDashboardCalendar();
-  if(managerUnlocked) renderManagerCalendar();
-}
-
-document.getElementById("vlForm").addEventListener("submit", e => {
-  e.preventDefault();
-
-  const employee = document.getElementById("employeeName").value.trim();
-  const start = document.getElementById("startDate").value;
-  const end = document.getElementById("endDate").value;
-  const box = document.getElementById("conflictBox");
-
-  if(!employee || !start || !end || dateObj(end) < dateObj(start)){
-    box.classList.remove("hidden");
-    box.textContent = "Please enter a valid date range.";
+  if (!leaveData.length) {
+    body.innerHTML = `<tr><td colspan="6" class="empty-state">No VL requests yet.</td></tr>`;
     return;
   }
 
-  const conflicts = leaveData.filter(x =>
-    overlaps(start,end,x.start,x.end) && x.status !== "Disapprove"
-  );
+  body.innerHTML = leaveData.map((item, index) => `
+    <tr>
+      <td class="employee-name">${escapeHtml(item.employee)}</td>
+      <td>${formatDate(item.start)}</td>
+      <td>${formatDate(item.end)}</td>
+      <td class="number-cell">${leaveDays(item.start, item.end)}</td>
+      <td>${statusBadge(item.status)}</td>
+      <td>
+        <div class="action-group">
+          <button class="small-btn" onclick="setRequestStatus(${index}, 'Approve')">Approve</button>
+          <button class="small-btn" onclick="setRequestStatus(${index}, 'Disapprove')">Disapprove</button>
+          <button class="delete-icon-btn" onclick="deleteRequest(${index})">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join("");
+}
 
-  if(conflicts.length){
-    box.classList.remove("hidden");
-    box.textContent =
-      "Conflict warning: " +
-      conflicts.map(x => `${x.employee} (${formatDate(x.start)}–${formatDate(x.end)})`).join(", ") +
-      " has overlapping leave.";
-  } else {
-    box.classList.add("hidden");
-  }
+function setRequestStatus(index, status) {
+  if (!leaveData[index]) return;
 
-  leaveData.push({employee,start,end,status:"Waiting Approval"});
+  leaveData[index].status = status;
+  saveData();
 
-  alert("VL request submitted. Status: Waiting Approval");
-
-  e.target.reset();
-  document.getElementById("employeeName").value = "Alex";
-
+  renderManagerRequests();
   renderDashboard();
-  renderCalendar();
-  if(managerUnlocked){
-    renderManager();
-    renderManagerCalendar();
-  }
-
-  showPage("dashboard");
-});
-
-// ---------------- MANAGER PASSWORD ----------------
-
-function openManagerLogin(){
-  const modal = document.getElementById("passwordModal");
-  modal.classList.remove("hidden");
-  document.getElementById("managerPassword").value = "";
-  document.getElementById("passwordError").textContent = "";
-  setTimeout(() => document.getElementById("managerPassword").focus(), 50);
 }
 
-function closeManagerLogin(){
-  document.getElementById("passwordModal").classList.add("hidden");
+function deleteRequest(index) {
+  if (!leaveData[index]) return;
+
+  const item = leaveData[index];
+
+  if (!confirm(`Delete the VL request for ${item.employee}?`)) return;
+
+  leaveData.splice(index, 1);
+  saveData();
+
+  renderManagerRequests();
+  renderDashboard();
 }
 
-function checkManagerPassword(){
-  const entered = document.getElementById("managerPassword").value;
-
-  if(entered === MANAGER_PASSWORD){
-    managerUnlocked = true;
-    closeManagerLogin();
-    showPage("manager");
-    renderEmployeeManager();
-  } else {
-    document.getElementById("passwordError").textContent = "Incorrect password.";
-  }
+function formatVL(value) {
+  const number = Number(value);
+  return Number.isInteger(number) ? String(number) : number.toFixed(1);
 }
 
-function lockManager(){
-  managerUnlocked = false;
-  showPage("dashboard");
+function formatDate(value) {
+  if (!value) return "-";
+
+  const date = new Date(value + "T00:00:00");
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
 }
 
-document.getElementById("managerPassword").addEventListener("keydown", e => {
-  if(e.key === "Enter") checkManagerPassword();
-});
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
+function escapeAttribute(value) {
+  return escapeHtml(value);
+}
+
+// Initial render
+saveData();
 renderDashboard();
-renderCalendar();
-renderManager();
-renderManagerCalendar();
-renderEmployeeManager();
+renderEmployeeSelect();

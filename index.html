@@ -1,96 +1,226 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VL Tracker</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VL Tracker</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<aside class="sidebar">
-  <div class="brand"><div class="brand-mark">VL</div><div><strong>VL Tracker</strong><span>Leave Management</span></div></div>
-  <nav>
-    <button class="nav-btn active" data-page="dashboard">Dashboard</button>
-    <button class="nav-btn" data-page="request">Request VL</button>
-    <button class="nav-btn" data-page="calendar">Team Calendar</button>
-    <button class="nav-btn" data-page="manager">Manager Dashboard</button>
-  </nav>
-  <div class="sidebar-footer">Internal Leave Management</div>
-</aside>
-
-<main class="main">
-<header class="topbar">
-  <div><p class="eyebrow">Vacation Leave</p><h1 id="pageTitle">Dashboard</h1></div>
-  <div class="user-chip"><div class="avatar">A</div><div><strong>Alex</strong><span>Employee</span></div></div>
-</header>
-
-<section id="dashboard" class="page active">
-  <div class="hero">
-    <div><p class="eyebrow">Vacation Leave</p><h2>Team Overview</h2><p>View leave balances and the team calendar.</p></div>
-    <button class="primary" onclick="showPage('request')">+ Request VL</button>
-  </div>
-  <div class="stats simple-stats">
-    <div class="stat-card"><span>Total Employees</span><strong id="totalEmployees">0</strong><small>team members</small></div>
-    <div class="stat-card"><span>Total Approved VL</span><strong id="totalApproved">0</strong><small>days taken</small></div>
-    <div class="stat-card"><span>Waiting Approval</span><strong id="totalPending">0</strong><small>requests</small></div>
-  </div>
-  <div class="card table-card">
-    <div class="card-head"><div><h3>Employee Leave Balance</h3><p>Approved leave and remaining balance for everyone.</p></div></div>
-    <table><thead><tr><th>Employee Name</th><th>Total VL</th><th>Approved VL</th><th>Available Balance</th></tr></thead>
-    <tbody id="employeeTable"></tbody></table>
-  </div>
-  <div class="card">
-    <div class="card-head"><div><h3>Team Calendar</h3><p>See team leave and approval status.</p></div><button class="secondary" onclick="showPage('calendar')">Open Calendar</button></div>
-    <div id="dashboardCalendar" class="mini-calendar"></div>
-  </div>
-</section>
-
-<section id="request" class="page">
-  <div class="section-title"><div><h2>Request Vacation Leave</h2><p>Submit a new leave request for manager approval.</p></div></div>
-  <div class="card form-card">
-    <form id="vlForm">
-      <label>Employee Name<input id="employeeName" value="Alex" required></label>
-      <div class="form-grid">
-        <label>Start Date<input id="startDate" type="date" required></label>
-        <label>End Date<input id="endDate" type="date" required></label>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">VL</div>
+        <div>
+          <div class="brand-title">VL Tracker</div>
+          <div class="brand-subtitle">Vacation Leave Management</div>
+        </div>
       </div>
-      <div id="conflictBox" class="conflict hidden"></div>
-      <div class="form-actions"><button type="button" class="secondary" onclick="showPage('dashboard')">Cancel</button><button type="submit" class="primary">Submit Request</button></div>
-    </form>
-  </div>
-</section>
 
-<section id="calendar" class="page">
-  <div class="section-title"><div><h2>Team Calendar</h2><p>See team leave and approval status.</p></div><button class="primary" onclick="showPage('request')">+ Request VL</button></div>
-  <div class="calendar-card">
-    <div class="calendar-toolbar"><button class="icon-btn" onclick="changeMonth(-1)">‹</button><h2 id="monthLabel"></h2><button class="icon-btn" onclick="changeMonth(1)">›</button></div>
-    <div class="weekdays"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
-    <div id="calendarGrid" class="calendar-grid"></div>
-    <div class="legend"><span><i class="dot approved-dot"></i>Approve</span><span><i class="dot pending-dot"></i>Waiting Approval</span><span><i class="dot rejected-dot"></i>Disapprove</span></div>
-  </div>
-</section>
+      <nav class="nav">
+        <button class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')">
+          <span class="nav-icon">▦</span> Dashboard
+        </button>
+        <button class="nav-item" data-page="request" onclick="showPage('request')">
+          <span class="nav-icon">＋</span> Request VL
+        </button>
+        <button class="nav-item" data-page="manager" onclick="openManager()">
+          <span class="nav-icon">⚙</span> Manager
+        </button>
+      </nav>
 
-<section id="manager" class="page">
-  <div class="section-title"><div><h2>Manager Dashboard</h2><p>Review requests and manage employees.</p></div><button class="secondary" onclick="lockManager()">Lock Manager Dashboard</button></div>
-  <div class="card table-card">
-    <table><thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Status</th><th>Change Status</th></tr></thead>
-    <tbody id="managerTable"></tbody></table>
+      <div class="sidebar-footer">
+        <div class="status-dot"></div>
+        Frontend Preview
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">TEAM LEAVE MANAGEMENT</div>
+          <h1 id="pageTitle">Dashboard</h1>
+        </div>
+        <button class="primary-btn top-action" onclick="showPage('request')">+ Request VL</button>
+      </header>
+
+      <section id="dashboardPage" class="page active-page">
+        <div class="hero-card">
+          <div>
+            <div class="hero-kicker">TEAM OVERVIEW</div>
+            <h2>Vacation Leave Balance</h2>
+            <p>Monitor total, approved, and available vacation leave for the team.</p>
+          </div>
+          <div class="hero-stat">
+            <span>Employees</span>
+            <strong id="employeeCount">0</strong>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-heading">
+            <div>
+              <h3>Employee Leave Summary</h3>
+              <p>Available VL is automatically calculated as Total VL minus Approved VL.</p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Total VL</th>
+                  <th>Approved VL</th>
+                  <th>Available VL</th>
+                </tr>
+              </thead>
+              <tbody id="dashboardEmployees"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-heading">
+            <div>
+              <h3>Recent VL Requests</h3>
+              <p>Current leave requests and their approval status.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                  <th>Days</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="dashboardRequests"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="requestPage" class="page">
+        <div class="page-intro">
+          <div class="hero-kicker">NEW REQUEST</div>
+          <h2>Request Vacation Leave</h2>
+          <p>Submit a leave request for approval.</p>
+        </div>
+
+        <div class="form-card">
+          <div class="form-grid">
+            <div class="field">
+              <label for="employeeSelect">Employee</label>
+              <select id="employeeSelect"></select>
+            </div>
+            <div class="field">
+              <label for="startDate">Start Date</label>
+              <input id="startDate" type="date">
+            </div>
+            <div class="field">
+              <label for="endDate">End Date</label>
+              <input id="endDate" type="date">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="secondary-btn" onclick="showPage('dashboard')">Cancel</button>
+            <button class="primary-btn" onclick="submitRequest()">Submit Request</button>
+          </div>
+        </div>
+
+        <div class="info-note">
+          <strong>Approval status</strong>
+          <span>New requests are created as <b>Waiting Approval</b>. In the future, Power Automate will handle the approval workflow.</span>
+        </div>
+      </section>
+
+      <section id="managerPage" class="page">
+        <div class="page-intro">
+          <div class="hero-kicker">MANAGER AREA</div>
+          <h2>Manager Dashboard</h2>
+          <p>Manage employees, Total VL, and existing requests.</p>
+        </div>
+
+        <div class="section-card">
+          <div class="section-heading">
+            <div>
+              <h3>Add Employee</h3>
+              <p>Create an employee and assign their Total VL.</p>
+            </div>
+          </div>
+          <div class="add-employee-row">
+            <div class="field">
+              <label for="newEmployeeName">Employee Name</label>
+              <input id="newEmployeeName" type="text" placeholder="e.g. Maria Santos">
+            </div>
+            <div class="field compact-field">
+              <label for="newEmployeeTotalVL">Total VL</label>
+              <input id="newEmployeeTotalVL" type="number" min="0" step="0.5" placeholder="15">
+            </div>
+            <button class="primary-btn add-btn" onclick="addEmployee()">Add Employee</button>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-heading">
+            <div>
+              <h3>Employee Management</h3>
+              <p>Total VL is editable. Approved VL and Available VL are calculated automatically.</p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Total VL</th>
+                  <th>Approved VL</th>
+                  <th>Available VL</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="employeeManagerTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-heading">
+            <div>
+              <h3>VL Requests</h3>
+              <p>For frontend testing, managers can approve, disapprove, or delete requests.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                  <th>Days</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="managerRequests"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="security-note">
+          <strong>Manager password</strong>
+          <span>Prototype password is editable in <code>script.js</code>. This is frontend-only protection and is not production authentication.</span>
+        </div>
+      </section>
+    </main>
   </div>
-  <div class="card manager-calendar-card"><div class="card-head"><div><h3>Team Calendar</h3><p>Manager view</p></div></div><div id="managerCalendar" class="mini-calendar"></div></div>
-</section>
-</main>
-<div id="passwordModal" class="password-modal hidden">
-  <div class="password-box">
-    <div class="password-title">Manager Login</div>
-    <p>Enter the manager password to open the Manager Dashboard.</p>
-    <input id="managerPassword" type="password" placeholder="Password">
-    <div id="passwordError" class="password-error"></div>
-    <div class="password-actions">
-      <button class="secondary" onclick="closeManagerLogin()">Cancel</button>
-      <button class="primary" onclick="checkManagerPassword()">Login</button>
-    </div>
-  </div>
-</div>
-<script src="script.js"></script>
+
+  <script src="script.js"></script>
 </body>
 </html>
