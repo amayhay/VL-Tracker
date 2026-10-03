@@ -57,6 +57,34 @@
           </div>
         </div>
 
+
+        <div class="section-card calendar-card">
+          <div class="section-heading">
+            <div>
+              <h3>VL Calendar</h3>
+              <p>View approved and pending leave requests by date.</p>
+            </div>
+          </div>
+
+          <div class="calendar-toolbar">
+            <div class="calendar-nav">
+              <button onclick="changeCalendarMonth(-1)" aria-label="Previous month">‹</button>
+              <button onclick="goToCurrentMonth()" aria-label="Current month">Today</button>
+              <button onclick="changeCalendarMonth(1)" aria-label="Next month">›</button>
+            </div>
+            <div class="calendar-month" id="calendarMonth"></div>
+            <div></div>
+          </div>
+
+          <div id="calendarGrid" class="calendar-grid"></div>
+
+          <div class="calendar-legend">
+            <span class="legend-item"><span class="legend-dot approve"></span> Approved</span>
+            <span class="legend-item"><span class="legend-dot waiting"></span> Waiting Approval</span>
+            <span class="legend-item"><span class="legend-dot disapprove"></span> Disapproved</span>
+          </div>
+        </div>
+
         <div class="section-card">
           <div class="section-heading">
             <div>

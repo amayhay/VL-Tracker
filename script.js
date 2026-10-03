@@ -120,6 +120,8 @@ function renderDashboard() {
     }).join("");
   }
 
+  renderCalendar();
+
   const requestBody = document.getElementById("dashboardRequests");
 
   if (!leaveData.length) {
@@ -399,7 +401,114 @@ function escapeAttribute(value) {
   return escapeHtml(value);
 }
 
+
+let calendarDate = new Date();
+
+function renderCalendar() {
+  const grid = document.getElementById("calendarGrid");
+  const title = document.getElementById("calendarMonth");
+
+  if (!grid || !title) return;
+
+  const year = calendarDate.getFullYear();
+  const month = calendarDate.getMonth();
+
+  title.textContent = calendarDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric"
+  });
+
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  let output = weekdays
+    .map(day => `<div class="calendar-weekday">${day}</div>`)
+    .join("");
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const prevMonthDays = new Date(year, month, 0).getDate();
+
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+
+  for (let cell = 0; cell < totalCells; cell++) {
+    const dayNumber = cell - firstDay + 1;
+    let cellDate;
+    let otherMonth = false;
+
+    if (dayNumber < 1) {
+      cellDate = new Date(year, month - 1, prevMonthDays + dayNumber);
+      otherMonth = true;
+    } else if (dayNumber > daysInMonth) {
+      cellDate = new Date(year, month + 1, dayNumber - daysInMonth);
+      otherMonth = true;
+    } else {
+      cellDate = new Date(year, month, dayNumber);
+    }
+
+    const dateKey = toDateKey(cellDate);
+    const isToday = dateKey === toDateKey(new Date());
+
+    const events = leaveData.filter(item =>
+      dateKey >= item.start && dateKey <= item.end
+    );
+
+    const eventHtml = events.map(item => `
+      <button
+        class="calendar-event ${statusClass(item.status)}"
+        title="${escapeAttribute(item.employee + ' — ' + item.status)}"
+        onclick="showCalendarRequest(${leaveData.indexOf(item)})"
+      >
+        ${escapeHtml(item.employee)}
+      </button>
+    `).join("");
+
+    output += `
+      <div class="calendar-day ${otherMonth ? "other-month" : ""} ${isToday ? "today" : ""}">
+        <div class="calendar-date">${cellDate.getDate()}</div>
+        ${eventHtml}
+      </div>
+    `;
+  }
+
+  grid.innerHTML = output;
+}
+
+function changeCalendarMonth(offset) {
+  calendarDate = new Date(
+    calendarDate.getFullYear(),
+    calendarDate.getMonth() + offset,
+    1
+  );
+  renderCalendar();
+}
+
+function goToCurrentMonth() {
+  const now = new Date();
+  calendarDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  renderCalendar();
+}
+
+function toDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function showCalendarRequest(index) {
+  const item = leaveData[index];
+  if (!item) return;
+
+  alert(
+    `${item.employee}\n` +
+    `${formatDate(item.start)} – ${formatDate(item.end)}\n` +
+    `Days: ${leaveDays(item.start, item.end)}\n` +
+    `Status: ${item.status}`
+  );
+}
+
 // Initial render
 saveData();
 renderDashboard();
 renderEmployeeSelect();
+renderCalendar();
