@@ -4,7 +4,7 @@
 // ============================================================
 const MANAGER_PASSWORD = "1234";
 
-const employees = [
+let employees = [
   {name:"Alex", balance:15},
   {name:"Juan", balance:15},
   {name:"John", balance:15}
@@ -51,6 +51,7 @@ function showPage(page){
   if(page === "manager"){
     renderManager();
     renderManagerCalendar();
+    renderEmployeeManager();
   }
 }
 
@@ -120,18 +121,94 @@ function renderManager(){
       <td>${formatDate(x.end)}</td>
       <td><span class="status ${statusClass(x.status)}">${x.status}</span></td>
       <td>
-        <select class="status-select" onchange="changeStatus(${i},this.value)">
-          <option ${x.status==="Waiting Approval"?"selected":""}>Waiting Approval</option>
-          <option ${x.status==="Approve"?"selected":""}>Approve</option>
-          <option ${x.status==="Disapprove"?"selected":""}>Disapprove</option>
-        </select>
+        <div class="manager-actions">
+          <select class="status-select" onchange="changeStatus(${i},this.value)">
+            <option ${x.status==="Waiting Approval"?"selected":""}>Waiting Approval</option>
+            <option ${x.status==="Approve"?"selected":""}>Approve</option>
+            <option ${x.status==="Disapprove"?"selected":""}>Disapprove</option>
+          </select>
+          <button class="danger-btn" onclick="deleteRequest(${i})">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join("");
+
+  renderEmployeeManager();
+}
+
+function changeStatus(i,status){
+  leaveData[i].status = status;
+  renderManager();
+  renderManagerCalendar();
+  renderCalendar();
+  renderDashboard();
+}
+
+
+function deleteRequest(i){
+  const request = leaveData[i];
+  if(!request) return;
+
+  if(!confirm(`Delete the VL request for ${request.employee} (${formatDate(request.start)} – ${formatDate(request.end)})?`))
+    return;
+
+  leaveData.splice(i,1);
+
+  renderManager();
+  renderManagerCalendar();
+  renderCalendar();
+  renderDashboard();
+}
+
+function renderEmployeeManager(){
+  const tbody = document.getElementById("employeeManagerTable");
+  if(!tbody) return;
+
+  tbody.innerHTML = employees.map((emp,i) => `
+    <tr>
+      <td><strong>${emp.name}</strong></td>
+      <td>
+        <div class="manager-actions">
+          <input class="employee-balance-input" id="balance-${i}" type="number" min="0" value="${emp.balance}">
+          <button class="small-btn" onclick="saveEmployeeBalance(${i})">Save</button>
+        </div>
+      </td>
+      <td>
+        <button class="danger-btn" onclick="deleteEmployee(${i})">Delete Employee</button>
       </td>
     </tr>
   `).join("");
 }
 
-function changeStatus(i,status){
-  leaveData[i].status = status;
+function saveEmployeeBalance(i){
+  const input = document.getElementById(`balance-${i}`);
+  const value = Number(input.value);
+
+  if(!Number.isFinite(value) || value < 0){
+    alert("Please enter a valid VL balance.");
+    return;
+  }
+
+  employees[i].balance = value;
+  renderEmployeeManager();
+  renderDashboard();
+}
+
+function deleteEmployee(i){
+  const employee = employees[i];
+  if(!employee) return;
+
+  if(!confirm(`Delete employee "${employee.name}"? This will also remove their plotted VL requests.`))
+    return;
+
+  employees.splice(i,1);
+
+  for(let j=leaveData.length-1;j>=0;j--){
+    if(leaveData[j].employee === employee.name)
+      leaveData.splice(j,1);
+  }
+
+  renderEmployeeManager();
   renderManager();
   renderManagerCalendar();
   renderCalendar();
@@ -289,6 +366,7 @@ function checkManagerPassword(){
     managerUnlocked = true;
     closeManagerLogin();
     showPage("manager");
+    renderEmployeeManager();
   } else {
     document.getElementById("passwordError").textContent = "Incorrect password.";
   }
@@ -307,3 +385,4 @@ renderDashboard();
 renderCalendar();
 renderManager();
 renderManagerCalendar();
+renderEmployeeManager();
