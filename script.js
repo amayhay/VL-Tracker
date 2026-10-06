@@ -1,34 +1,162 @@
 const MANAGER_PASSWORD = "1234";
 
-// Demo data for the frontend prototype.
-// Changes are saved in the browser using localStorage.
-const defaultEmployees = [
-  { name: "Alex", totalVL: 15 },
-  { name: "Juan", totalVL: 12 },
-  { name: "John", totalVL: 20 }
-];
+// Firebase / Firestore is initialized in index_firebase.html.
+// Firestore collections used by this app:
+//   employees: name (string), totalVL (number), active (boolean)
+//   requests: employee (string), startDate (string), endDate (string), days (number), status (string)
 
-const defaultLeaveData = [
-  { employee: "Alex", start: "2026-10-10", end: "2026-10-12", status: "Approve" },
-  { employee: "Juan", start: "2026-10-15", end: "2026-10-17", status: "Waiting Approval" },
-  { employee: "John", start: "2026-10-20", end: "2026-10-22", status: "Disapprove" }
-];
+let employees = [];
+let leaveData = [];
+let calendarDate = new Date();
+let firebaseReady = false;
 
-let employees = loadData("vl_employees", defaultEmployees);
-let leaveData = loadData("vl_requests", defaultLeaveData);
+function showLoadingState(message = "Loading VL data...") {
+  const employeeBody = document.getElementById("dashboardEmployees");
+  const requestBody = document.getElementById("dashboardRequests");
+  const managerEmployeeBody = document.getElementById("employeeManagerTable");
+  const managerRequestBody = document.getElementById("managerRequests");
 
-function loadData(key, fallback) {
-  try {
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : structuredClone(fallback);
-  } catch {
-    return structuredClone(fallback);
-  }
+  if (employeeBody) employeeBody.innerHTML = `<tr><td colspan="4" class="empty-state">${escapeHtml(message)}</td></tr>`;
+  if (requestBody) requestBody.innerHTML = `<tr><td colspan="5" class="empty-state">${escapeHtml(message)}</td></tr>`;
+  if (managerEmployeeBody) managerEmployeeBody.innerHTML = `<tr><td colspan="5" class="empty-state">${escapeHtml(message)}</td></tr>`;
+  if (managerRequestBody) managerRequestBody.innerHTML = `<tr><td colspan="6" class="empty-state">${escapeHtml(message)}</td></tr>`;
 }
 
-function saveData() {
-  localStorage.setItem("vl_employees", JSON.stringify(employees));
-  localStorage.setItem("vl_requests", JSON.stringify(leaveData));
+async function loadDataFromFirebase() {
+  if (!window.db) {
+    throw new Error("Firebase Firestore was not initialized.");
+  }
+
+  const [employeeSnapshot, requestSnapshot] = await Promise.all([
+    window.db.collection("employees").get(),
+    window.db.collection("requests").get()
+  ]);
+
+  employees = employeeSnapshot.docs
+    .map(doc => ({
+      id: doc.id,
+      name: String(doc.data().name || "").trim(),
+      totalVL: Number(doc.data().totalVL ?? 0),
+      active: doc.data().active !== false
+    }))
+    .filter(emp => emp.name && emp.active);
+
+  leaveData = requestSnapshot.docs
+    .map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        employee: String(data.employee || "").trim(),
+        start: normalizeDateValue(data.startDate ?? data.start),
+        end: normalizeDateValue(data.endDate ?? data.end),
+        status: String(data.status || "Waiting Approval")
+      };
+    })
+    .filter(item => item.employee && item.start && item.end);
+
+  // Newest requests first, matching the original prototype behavior.
+  leaveData.sort((a, b) => String(b.start).localeCompare(String(a.start)));
+
+  firebaseReady = true;
+  refreshVisibleData();
+}
+
+function normalizeDateValue(value) {
+  if (!value) return "";
+
+  if (typeof value === "string") {
+    return value.slice(0, 10);
+  }
+
+  // Firestore Timestamp / Date support.
+  if (typeof value.toDate === "function") {
+    return toDateKey(value.toDate());
+  }
+
+  if (value instanceof Date) {
+    return toDateKey(value);
+  }
+
+  return String(value).slice(0, 10);
+}
+
+async function addEmployeeToFirebase(name, totalVL) {
+  const docRef = await window.db.collection("employees").add({
+    name,
+    totalVL,
+    active: true
+  });
+
+  return docRef.id;
+}
+
+async function updateEmployeeInFirebase(employee, totalVL) {
+  if (!employee.id) throw new Error("Employee document ID is missing.");
+
+  await window.db.collection("employees").doc(employee.id).update({
+    totalVL
+  });
+}
+
+async function deleteEmployeeFromFirebase(employee) {
+  if (!employee.id) throw new Error("Employee document ID is missing.");
+
+  const requestSnapshot = await window.db
+    .collection("requests")
+    .where("employee", "==", employee.name)
+    .get();
+
+  const batch = window.db.batch();
+  batch.delete(window.db.collection("employees").doc(employee.id));
+
+  requestSnapshot.forEach(doc => {
+    batch.delete(doc.ref);
+  });
+
+  await batch.commit();
+}
+
+async function addRequestToFirebase(request) {
+  const docRef = await window.db.collection("requests").add({
+    employee: request.employee,
+    startDate: request.start,
+    endDate: request.end,
+    days: leaveDays(request.start, request.end),
+    status: request.status
+  });
+
+  return docRef.id;
+}
+
+async function updateRequestInFirebase(request, status) {
+  if (!request.id) throw new Error("Request document ID is missing.");
+
+  await window.db.collection("requests").doc(request.id).update({
+    status
+  });
+}
+
+async function deleteRequestFromFirebase(request) {
+  if (!request.id) throw new Error("Request document ID is missing.");
+
+  await window.db.collection("requests").doc(request.id).delete();
+}
+
+async function refreshData() {
+  await loadDataFromFirebase();
+}
+
+function refreshVisibleData() {
+  renderDashboard();
+  renderEmployeeSelect();
+
+  const managerPage = document.getElementById("managerPage");
+  if (managerPage && managerPage.classList.contains("active-page")) {
+    renderEmployeeManager();
+    renderManagerRequests();
+  }
+
+  renderCalendar();
 }
 
 function showPage(page) {
@@ -94,13 +222,16 @@ function statusClass(status) {
 }
 
 function statusBadge(status) {
-  return `<span class="status ${statusClass(status)}">${status}</span>`;
+  return `<span class="status ${statusClass(status)}">${escapeHtml(status)}</span>`;
 }
 
 function renderDashboard() {
-  document.getElementById("employeeCount").textContent = employees.length;
+  const employeeCount = document.getElementById("employeeCount");
+  if (employeeCount) employeeCount.textContent = employees.length;
 
   const employeeBody = document.getElementById("dashboardEmployees");
+
+  if (!employeeBody) return;
 
   if (!employees.length) {
     employeeBody.innerHTML = `<tr><td colspan="4" class="empty-state">No employees added yet.</td></tr>`;
@@ -124,6 +255,8 @@ function renderDashboard() {
 
   const requestBody = document.getElementById("dashboardRequests");
 
+  if (!requestBody) return;
+
   if (!leaveData.length) {
     requestBody.innerHTML = `<tr><td colspan="5" class="empty-state">No VL requests yet.</td></tr>`;
   } else {
@@ -141,6 +274,7 @@ function renderDashboard() {
 
 function renderEmployeeSelect() {
   const select = document.getElementById("employeeSelect");
+  if (!select) return;
 
   if (!employees.length) {
     select.innerHTML = `<option value="">No employees available</option>`;
@@ -152,7 +286,12 @@ function renderEmployeeSelect() {
   ).join("");
 }
 
-function submitRequest() {
+async function submitRequest() {
+  if (!firebaseReady) {
+    alert("VL data is still loading. Please try again in a moment.");
+    return;
+  }
+
   const employee = document.getElementById("employeeSelect").value;
   const start = document.getElementById("startDate").value;
   const end = document.getElementById("endDate").value;
@@ -182,23 +321,29 @@ function submitRequest() {
     return;
   }
 
-  leaveData.unshift({
-    employee,
-    start,
-    end,
-    status: "Waiting Approval"
-  });
+  try {
+    await addRequestToFirebase({
+      employee,
+      start,
+      end,
+      status: "Waiting Approval"
+    });
 
-  saveData();
+    await refreshData();
 
-  alert("VL request submitted successfully.");
-  document.getElementById("startDate").value = "";
-  document.getElementById("endDate").value = "";
-  showPage("dashboard");
+    alert("VL request submitted successfully.");
+    document.getElementById("startDate").value = "";
+    document.getElementById("endDate").value = "";
+    showPage("dashboard");
+  } catch (error) {
+    console.error("Error submitting VL request:", error);
+    alert("Unable to submit the VL request. Please check your Firebase connection and try again.");
+  }
 }
 
 function renderEmployeeManager() {
   const body = document.getElementById("employeeManagerTable");
+  if (!body) return;
 
   if (!employees.length) {
     body.innerHTML = `<tr><td colspan="5" class="empty-state">No employees added yet.</td></tr>`;
@@ -236,7 +381,12 @@ function renderEmployeeManager() {
   }).join("");
 }
 
-function addEmployee() {
+async function addEmployee() {
+  if (!firebaseReady) {
+    alert("VL data is still loading. Please try again in a moment.");
+    return;
+  }
+
   const nameInput = document.getElementById("newEmployeeName");
   const totalInput = document.getElementById("newEmployeeTotalVL");
 
@@ -264,22 +414,31 @@ function addEmployee() {
     return;
   }
 
-  employees.push({ name, totalVL });
-  saveData();
+  try {
+    await addEmployeeToFirebase(name, totalVL);
+    await refreshData();
 
-  nameInput.value = "";
-  totalInput.value = "";
+    nameInput.value = "";
+    totalInput.value = "";
 
-  renderEmployeeManager();
-  renderDashboard();
-  renderEmployeeSelect();
+    renderEmployeeManager();
+    renderDashboard();
+    renderEmployeeSelect();
 
-  alert(`${name} has been added.`);
+    alert(`${name} has been added.`);
+  } catch (error) {
+    console.error("Error adding employee:", error);
+    alert("Unable to add the employee. Please check your Firebase connection and try again.");
+  }
 }
 
-function saveEmployeeTotalVL(index) {
+async function saveEmployeeTotalVL(index) {
+  if (!firebaseReady) return;
+
+  const employee = employees[index];
   const input = document.getElementById(`totalVL-${index}`);
-  if (!input) return;
+
+  if (!employee || !input) return;
 
   const value = Number(input.value);
 
@@ -288,14 +447,16 @@ function saveEmployeeTotalVL(index) {
     return;
   }
 
-  employees[index].totalVL = value;
-  saveData();
-
-  renderEmployeeManager();
-  renderDashboard();
+  try {
+    await updateEmployeeInFirebase(employee, value);
+    await refreshData();
+  } catch (error) {
+    console.error("Error updating Total VL:", error);
+    alert("Unable to update Total VL. Please check your Firebase connection and try again.");
+  }
 }
 
-function deleteEmployee(index) {
+async function deleteEmployee(index) {
   const employee = employees[index];
 
   if (!employee) return;
@@ -308,20 +469,18 @@ function deleteEmployee(index) {
 
   if (!confirm(message)) return;
 
-  employees.splice(index, 1);
-
-  leaveData = leaveData.filter(item => item.employee !== employee.name);
-
-  saveData();
-
-  renderEmployeeManager();
-  renderManagerRequests();
-  renderDashboard();
-  renderEmployeeSelect();
+  try {
+    await deleteEmployeeFromFirebase(employee);
+    await refreshData();
+  } catch (error) {
+    console.error("Error deleting employee:", error);
+    alert("Unable to delete the employee. Please check your Firebase connection and try again.");
+  }
 }
 
 function renderManagerRequests() {
   const body = document.getElementById("managerRequests");
+  if (!body) return;
 
   if (!leaveData.length) {
     body.innerHTML = `<tr><td colspan="6" class="empty-state">No VL requests yet.</td></tr>`;
@@ -346,28 +505,32 @@ function renderManagerRequests() {
   `).join("");
 }
 
-function setRequestStatus(index, status) {
-  if (!leaveData[index]) return;
+async function setRequestStatus(index, status) {
+  const request = leaveData[index];
+  if (!request) return;
 
-  leaveData[index].status = status;
-  saveData();
-
-  renderManagerRequests();
-  renderDashboard();
+  try {
+    await updateRequestInFirebase(request, status);
+    await refreshData();
+  } catch (error) {
+    console.error("Error updating request status:", error);
+    alert("Unable to update the request status. Please check your Firebase connection and try again.");
+  }
 }
 
-function deleteRequest(index) {
-  if (!leaveData[index]) return;
+async function deleteRequest(index) {
+  const request = leaveData[index];
+  if (!request) return;
 
-  const item = leaveData[index];
+  if (!confirm(`Delete the VL request for ${request.employee}?`)) return;
 
-  if (!confirm(`Delete the VL request for ${item.employee}?`)) return;
-
-  leaveData.splice(index, 1);
-  saveData();
-
-  renderManagerRequests();
-  renderDashboard();
+  try {
+    await deleteRequestFromFirebase(request);
+    await refreshData();
+  } catch (error) {
+    console.error("Error deleting request:", error);
+    alert("Unable to delete the VL request. Please check your Firebase connection and try again.");
+  }
 }
 
 function formatVL(value) {
@@ -400,9 +563,6 @@ function escapeHtml(value) {
 function escapeAttribute(value) {
   return escapeHtml(value);
 }
-
-
-let calendarDate = new Date();
 
 function renderCalendar() {
   const grid = document.getElementById("calendarGrid");
@@ -455,7 +615,7 @@ function renderCalendar() {
     const eventHtml = events.map(item => `
       <button
         class="calendar-event ${statusClass(item.status)}"
-        title="${escapeAttribute(item.employee + ' — ' + item.status)}"
+        title="${escapeAttribute(item.employee + " — " + item.status)}"
         onclick="showCalendarRequest(${leaveData.indexOf(item)})"
       >
         ${escapeHtml(item.employee)}
@@ -507,8 +667,24 @@ function showCalendarRequest(index) {
   );
 }
 
-// Initial render
-saveData();
-renderDashboard();
-renderEmployeeSelect();
-renderCalendar();
+// Make functions available to the existing HTML onclick handlers.
+window.showPage = showPage;
+window.openManager = openManager;
+window.submitRequest = submitRequest;
+window.addEmployee = addEmployee;
+window.saveEmployeeTotalVL = saveEmployeeTotalVL;
+window.deleteEmployee = deleteEmployee;
+window.setRequestStatus = setRequestStatus;
+window.deleteRequest = deleteRequest;
+window.changeCalendarMonth = changeCalendarMonth;
+window.goToCurrentMonth = goToCurrentMonth;
+window.showCalendarRequest = showCalendarRequest;
+
+// Initial render: load the central Firestore data first.
+showLoadingState();
+
+loadDataFromFirebase().catch(error => {
+  console.error("Unable to load Firebase data:", error);
+  firebaseReady = false;
+  showLoadingState("Unable to load VL data. Check your Firebase Firestore rules and connection.");
+});

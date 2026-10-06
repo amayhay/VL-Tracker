@@ -249,6 +249,23 @@
     </main>
   </div>
 
-  <script src="script.js"></script>
+  <!-- Firebase Web SDK (no npm required) -->
+  <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAgLcU0CkkpRmfXMApIuqDXwzAqFvYQIdI",
+      authDomain: "vl-tracker-3ec08.firebaseapp.com",
+      projectId: "vl-tracker-3ec08",
+      storageBucket: "vl-tracker-3ec08.firebasestorage.app",
+      messagingSenderId: "149511435809",
+      appId: "1:149511435809:web:93cd7f79441334039c5560",
+      measurementId: "G-NN77SYX4FT"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    window.db = firebase.firestore();
+  </script>
+  <script src="script_firebase.js"></script>
 </body>
 </html>
